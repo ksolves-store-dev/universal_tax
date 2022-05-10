@@ -304,3 +304,22 @@ class KsAccountMoveLine(models.Model):
         self._check_tax_lock_date()
         if self._context.get('check_move_validity', True):
             moves._check_balanced()
+
+
+class KsAccountPaymentRegister(models.TransientModel):
+    _inherit = 'account.payment.register'
+    _description = 'Register Payment'
+
+    @api.depends('source_amount', 'source_amount_currency', 'source_currency_id', 'company_id', 'currency_id', 'payment_date')
+    def _compute_amount(self):
+        for wizard in self:
+            if wizard.source_currency_id == wizard.currency_id:
+                # Same currency.
+                wizard.amount = wizard.source_amount_currency/2
+            elif wizard.currency_id == wizard.company_id.currency_id:
+                # Payment expressed on the company's currency.
+                wizard.amount = wizard.source_amount
+            else:
+                # Foreign currency on payment different than the one set on the journal entries.
+                amount_payment_currency = wizard.company_id.currency_id._convert(wizard.source_amount, wizard.currency_id, wizard.company_id, wizard.payment_date)
+                wizard.amount = amount_payment_currency
