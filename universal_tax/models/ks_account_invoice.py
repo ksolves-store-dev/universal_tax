@@ -34,7 +34,7 @@ class KsGlobalTaxInvoice(models.Model):
         for rec in self:
             if 'ks_amount_discount' in rec:
                 rec.ks_calculate_discount()
-
+            rec.amount_residual = rec.amount_total + rec.ks_amount_global_tax
             rec.ks_calculate_tax()
             rec.ks_update_universal_tax()
             sign = rec.move_type in ['in_refund', 'out_refund'] and -1 or 1
