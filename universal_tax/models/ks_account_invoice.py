@@ -34,7 +34,7 @@ class KsGlobalTaxInvoice(models.Model):
         for rec in self:
             if 'ks_amount_discount' in rec:
                 rec.ks_calculate_discount()
-            rec.amount_residual = rec.amount_total + rec.ks_amount_global_tax
+
             rec.ks_calculate_tax()
             rec.ks_update_universal_tax()
             sign = rec.move_type in ['in_refund', 'out_refund'] and -1 or 1
@@ -289,37 +289,41 @@ class KsGlobalTaxInvoice(models.Model):
     def _check_balanced(self):
         return True
 
-
-class KsAccountMoveLine(models.Model):
-    _inherit = "account.move.line"
-
-    def unlink(self):
-        moves = self.mapped('move_id')
-        # Prevent deleting lines on posted entries
-        if not self.env.context.get('force_delete', True) and any(m.state == 'posted' for m in moves):
-            raise UserError(_('You cannot delete an item linked to a posted entry.'))
-        self._check_reconciliation()
-        moves._check_fiscalyear_lock_date()
-        # Check the tax lock date.
-        self._check_tax_lock_date()
-        if self._context.get('check_move_validity', True):
-            moves._check_balanced()
-
+#
+# class KsAccountMoveLine(models.Model):
+#     _inherit = "account.move.line"
+#
+#     def unlink(self):
+#             moves = self.mapped('move_id')
+#             Prevent deleting lines on posted entries
+#         if not self.env.context.get('force_delete', True) and any(m.state == 'posted' for m in moves):
+#         raise UserError(_('You cannot delete an item linked to a posted entry.'))
+#         self._check_reconciliation()
+#         moves._check_fiscalyear_lock_date()
+#             Check the tax lock date.
+#         self._check_tax_lock_date()
+#         if self._context.get('check_move_validity', True):
+#             moves._check_balanced()
+#
 
 class KsAccountPaymentRegister(models.TransientModel):
     _inherit = 'account.payment.register'
     _description = 'Register Payment'
 
-    @api.depends('source_amount', 'source_amount_currency', 'source_currency_id', 'company_id', 'currency_id', 'payment_date')
+    @api.depends('source_amount', 'source_amount_currency', 'source_currency_id', 'company_id', 'currency_id',
+                 'payment_date')
     def _compute_amount(self):
+        super(KsAccountPaymentRegister, self)._compute_amount()
         for wizard in self:
             if wizard.source_currency_id == wizard.currency_id:
                 # Same currency.
-                wizard.amount = wizard.source_amount_currency/2
+                wizard.amount = wizard.source_amount_currency
             elif wizard.currency_id == wizard.company_id.currency_id:
                 # Payment expressed on the company's currency.
                 wizard.amount = wizard.source_amount
             else:
                 # Foreign currency on payment different than the one set on the journal entries.
-                amount_payment_currency = wizard.company_id.currency_id._convert(wizard.source_amount, wizard.currency_id, wizard.company_id, wizard.payment_date)
+                amount_payment_currency = wizard.company_id.currency_id._convert(wizard.source_amount,
+                                                                                 wizard.currency_id, wizard.company_id,
+                                                                                 wizard.payment_date)
                 wizard.amount = amount_payment_currency
